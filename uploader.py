@@ -1,106 +1,117 @@
-import json
 import os
-import time
-from datetime import datetime, timedelta, timezone
-
+import google_auth_oauthlib.flow
+import googleapiclient.discovery
+import googleapiclient.errors
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-with open("config.json") as f:
-    config = json.load(f)
+# YouTube Data API upload scope required
+scopes = ["https://www.googleapis.com/auth/youtube.upload"]
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-TOKEN_FILE = "youtube_token.json"
-CLIENT_SECRET_FILE = config.get("youtube_client_secret_file", "client_secret.json")
-CATEGORY_ID = config.get("youtube_category_id", "20")
-PRIVACY = config.get("youtube_privacy", "public")
-
-
-def get_youtube_service():
+def get_authenticated_service():
+    """
+    Authenticates the user using client_secret.json and generates/loads token.json
+    for future automated uploads without human intervention.
+    """
     creds = None
-
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-
+    # The file token.json stores the user's access and refresh tokens
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', scopes)
+        
+    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
+            print("Refreshing YouTube access token...")
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+            if not os.path.exists('client_secret.json'):
+                print("Error: client_secret.json file not found! Pls add it to the folder.")
+                return None
+                
+            print("No authorization token found. Starting browser login process...")
+            print("Please log in with your NEW YouTube Channel account!")
+            
+            flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
+                'client_secret.json', scopes)
             creds = flow.run_local_server(port=0)
-        with open(TOKEN_FILE, "w") as token:
+            
+        # Save the credentials for the next run (And for GitHub actions)
+        with open('token.json', 'w') as token:
             token.write(creds.to_json())
+            print("Successfully saved token.json!")
 
-    return build("youtube", "v3", credentials=creds)
+    return googleapiclient.discovery.build("youtube", "v3", credentials=creds)
 
-
-def upload_to_youtube(
-    video_path: str,
-    title: str,
-    description: str,
-    tags: list,
-    publish_at: str = None
-) -> str:
-    youtube = get_youtube_service()
-
-    if len(title) > 100:
-        title = title[:97] + "..."
-
+def upload_video(youtube, file_path, title, description, tags):
+    """
+    Uploads the video file to YouTube using the authenticated service.
+    """
+    print(f"Preparing to upload: {file_path}")
+    
     body = {
         "snippet": {
-            "title": title,
+            "title": title[:100],  # Title max characters is 100
             "description": description,
             "tags": tags,
-            "categoryId": CATEGORY_ID,
-            "defaultLanguage": "hi"
+            "categoryId": "10" # 10 = Music Category
         },
         "status": {
-            "privacyStatus": PRIVACY if not publish_at else "private",
+            "privacyStatus": "public",
             "selfDeclaredMadeForKids": False
         }
     }
 
-    if publish_at:
-        body["status"]["publishAt"] = publish_at
-        body["status"]["privacyStatus"] = "private"
+    try:
+        # Create and upload the video
+        insert_request = youtube.videos().insert(
+            part=",".join(body.keys()),
+            body=body,
+            media_body=MediaFileUpload(file_path, chunksize=-1, resumable=True)
+        )
+        
+        print("Uploading to YouTube... This depends on your internet speed.")
+        response = insert_request.execute()
+        
+        print(f"\n✅ Upload Successful! Video ID: {response['id']}")
+        print(f"Link: https://youtu.be/{response['id']}\n")
+        return True
+        
+    except googleapiclient.errors.HttpError as e:
+        print("A YouTube API error occurred:\n%s" % e.content)
+        return False
 
-    media = MediaFileUpload(
-        video_path,
-        mimetype="video/mp4",
-        resumable=True,
-        chunksize=1024 * 1024
-    )
+def run_upload(video_path="downloads/final_video.mp4", song_title="NCS Track", video_type="long"):
+    """Main function called by our orchestrator"""
+    if not os.path.exists(video_path):
+        print(f"Error: Final video not found at {video_path}")
+        return False
+        
+    youtube = get_authenticated_service()
+    if not youtube:
+        return False
+        
+    formatted_title = f"{song_title} | Aesthetic Custom Visualizer | No Copyright"
+    if video_type == "short":
+        formatted_title += " #Shorts"
+        
+    desc = f"""Listen to {song_title} - Free to use No Copyright Music 🎵
+    
+Autogenerated with a fully open-source custom Python Video Bot!
+- AI generated background upscaled to HD
+- Custom Dynamic Cyberpunk Equalizer (Synced to beat)
+- Fully Automated Pipeline
 
-    request = youtube.videos().insert(
-        part="snippet,status",
-        body=body,
-        media_body=media
-    )
+#NCS #NoCopyrightSounds #AestheticMusic #Lofi #Cyberpunk"""
+    if video_type == "short":
+        desc += " #Shorts #YouTubeShorts"
 
-    print(f"Uploading: {title}")
-    response = None
-    while response is None:
-        status, response = request.next_chunk()
-        if status:
-            print(f"Upload progress: {int(status.progress() * 100)}%")
+    tags = ["NCS", "No Copyright Sounds", "Aesthetic", "Music Visualizer", "Cyberpunk", "Free Music"]
+    if video_type == "short":
+        tags.append("Shorts")
 
-    video_id = response.get("id")
-    print(f"Uploaded! https://youtu.be/{video_id}")
-    return video_id
+    return upload_video(youtube, video_path, formatted_title, desc, tags)
 
+if __name__ == "__main__":
+    run_upload()
 
-def schedule_uploads(video_files: list, titles: list, descriptions: list, tags_list: list):
-    gap_hours = config.get("gap_hours", 3)
-    now = datetime.now(timezone.utc)
-
-    for i, (video_path, title, description, tags) in enumerate(
-        zip(video_files, titles, descriptions, tags_list)
-    ):
-        publish_time = now + timedelta(hours=gap_hours * i)
-        publish_at = publish_time.strftime("%Y-%m-%dT%H:%M:%S.0Z")
-        print(f"Scheduling video {i+1} at {publish_at}")
-        upload_to_youtube(video_path, title, description, tags, publish_at=publish_at)
-        time.sleep(5)
