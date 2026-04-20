@@ -1,0 +1,31 @@
+{
+  "lichess_username": "YOUR_LICHESS_USERNAME",
+  "chesscom_username": "YOUR_CHESSCOM_USERNAME",
+  "use_platform": "lichess",
+
+  "openai_api_key": "YOUR_OPENAI_API_KEY",
+
+  "elevenlabs_api_key": "YOUR_ELEVENLABS_API_KEY",
+  "elevenlabs_voice_id": "YOUR_VOICE_ID",
+  "elevenlabs_settings": {
+    "stability": 0.50,
+    "similarity_boost": 0.75,
+    "style": 0.25,
+    "use_speaker_boost": true,
+    "speed": 1.10
+  },
+
+  "youtube_client_secret_file": "client_secret.json",
+  "youtube_channel_id": "YOUR_CHANNEL_ID",
+  "youtube_category_id": "20",
+  "youtube_privacy": "public",
+
+  "videos_per_day": 4,
+  "gap_hours": 3,
+
+  "output_dir": "output",
+  "chess_board_theme": "brown",
+  "piece_theme": "cburnett",
+  "clip_duration_min": 7,
+  "clip_duration_max": 12
+}
