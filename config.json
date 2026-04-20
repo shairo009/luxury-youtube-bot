@@ -3,9 +3,8 @@
   "chesscom_username": "YOUR_CHESSCOM_USERNAME",
   "use_platform": "lichess",
 
-  "openai_api_key": "YOUR_OPENAI_API_KEY",
+  "openrouter_model": "mistralai/mistral-7b-instruct:free",
 
-  "elevenlabs_api_key": "YOUR_ELEVENLABS_API_KEY",
   "elevenlabs_voice_id": "YOUR_VOICE_ID",
   "elevenlabs_settings": {
     "stability": 0.50,
