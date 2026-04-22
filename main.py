@@ -47,22 +47,34 @@ TOP_PLAYERS = [
 
 
 def fetch_top_player_game():
-    player = random.choice(TOP_PLAYERS)
-    print(f"Fetching games from top player: {player}")
-    url = f"https://lichess.org/api/games/user/{player}?max=30&analysed=true&evals=true&perfType=bullet,blitz"
-    headers = {"Accept": "application/x-ndjson"}
-    r = requests.get(url, headers=headers, stream=True, timeout=15)
-    games = []
-    for line in r.iter_lines():
-        if line:
-            try:
-                games.append(json.loads(line))
-            except Exception:
-                pass
-    if not games:
-        raise Exception(f"No analysed games found for {player}")
-    print(f"Found {len(games)} games from {player}")
-    return random.choice(games), player
+    # Try multiple players until we find one with valid games
+    shuffled_players = TOP_PLAYERS.copy()
+    random.shuffle(shuffled_players)
+    
+    for player in shuffled_players:
+        try:
+            print(f"Fetching games from top player: {player}")
+            url = f"https://lichess.org/api/games/user/{player}?max=50&analysed=true&evals=true&perfType=bullet,blitz"
+            headers = {"Accept": "application/x-ndjson"}
+            r = requests.get(url, headers=headers, stream=True, timeout=15)
+            
+            games = []
+            for line in r.iter_lines():
+                if line:
+                    try:
+                        games.append(json.loads(line))
+                    except Exception:
+                        pass
+            
+            if games:
+                print(f"Found {len(games)} games from {player}")
+                return random.choice(games), player
+            else:
+                print(f"No analysed games found for {player}, trying next...")
+        except Exception as e:
+            print(f"Error fetching from {player}: {e}")
+            
+    raise Exception("Could not find any analysed games for any of the top players.")
 
 
 def extract_blunder(game):
