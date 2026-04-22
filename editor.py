@@ -12,7 +12,7 @@ OUTPUT_DIR = config.get("output_dir", "output")
 
 def fetch_board_gif(game_id: str, blunder_index: int) -> str:
     gif_path = f"{OUTPUT_DIR}/board_{game_id}.gif"
-    url = f"https://lichess.org/game/export/gif/{game_id}.gif?theme={config['chess_board_theme']}&piece={config['piece_theme']}"
+    url = f"https://lichess1.org/game/export/gif/white/{game_id}.gif?theme={config['chess_board_theme']}&piece={config['piece_theme']}"
     r = requests.get(url)
     if r.status_code == 200:
         with open(gif_path, "wb") as f:
