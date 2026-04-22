@@ -207,6 +207,16 @@ def run_all():
 
 if __name__ == "__main__":
     if "--single" in sys.argv:
-        make_one_video(index=int(time.time()) % 10000)
+        # Retry up to 3 times for a single video in case of transient API errors (like Lichess GIF 404)
+        for attempt in range(3):
+            try:
+                make_one_video(index=int(time.time()) % 10000)
+                break
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                if attempt == 2:
+                    raise e
+                print("Retrying in 10 seconds...")
+                time.sleep(10)
     else:
         run_all()

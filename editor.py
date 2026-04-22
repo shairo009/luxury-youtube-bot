@@ -12,15 +12,29 @@ OUTPUT_DIR = config.get("output_dir", "output")
 
 def fetch_board_gif(game_id: str, blunder_index: int) -> str:
     gif_path = f"{OUTPUT_DIR}/board_{game_id}.gif"
-    url = f"https://lichess1.org/game/export/gif/white/{game_id}.gif?theme={config['chess_board_theme']}&piece={config['piece_theme']}"
-    r = requests.get(url)
-    if r.status_code == 200:
-        with open(gif_path, "wb") as f:
-            f.write(r.content)
-        print(f"Board GIF saved: {gif_path}")
-        return gif_path
-    else:
-        raise Exception(f"Could not fetch board GIF: {r.status_code}")
+    
+    # Try multiple URL variations as Lichess endpoints can be inconsistent
+    urls = [
+        f"https://lichess.org/game/export/gif/{game_id}.gif?theme={config['chess_board_theme']}&piece={config['piece_theme']}",
+        f"https://lichess1.org/game/export/gif/white/{game_id}.gif?theme={config['chess_board_theme']}&piece={config['piece_theme']}",
+        f"https://lichess1.org/game/export/gif/{game_id}.gif"
+    ]
+    
+    for url in urls:
+        try:
+            print(f"Trying to fetch GIF from: {url}")
+            r = requests.get(url, timeout=20)
+            if r.status_code == 200:
+                with open(gif_path, "wb") as f:
+                    f.write(r.content)
+                print(f"Board GIF saved: {gif_path}")
+                return gif_path
+            else:
+                print(f"Failed with status code: {r.status_code}")
+        except Exception as e:
+            print(f"Error fetching from {url}: {e}")
+            
+    raise Exception(f"Could not fetch board GIF after multiple attempts for game {game_id}")
 
 
 def convert_gif_to_mp4(gif_path: str, output_path: str) -> str:
