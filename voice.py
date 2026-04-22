@@ -1,25 +1,18 @@
 import os
-import asyncio
-import edge_tts
+from gtts import gTTS
 
 def generate_voice(text: str, output_path: str, voice_id: str = None, api_key: str = None) -> str:
-    # We switch to edge-tts because ElevenLabs has limits. 
-    # This is free and high quality.
+    # We switch to gTTS because it's the most reliable on GitHub Actions.
+    # It's free and always works.
     
-    # Common good voices: en-US-GuyNeural, en-IN-PrabhatNeural, hi-IN-MadhurNeural
-    # Since the bot uses Hinglish, we use a clear Indian English voice.
-    voice = "en-IN-PrabhatNeural" 
+    print(f"Generating voice (gTTS): {text[:60]}...")
     
-    print(f"Generating voice (Edge-TTS): {text[:60]}...")
+    # Using 'hi' (Hindi) with 'en' (English) accent works well for Hinglish.
+    # Or just 'en' with Indian accent.
+    tts = gTTS(text=text, lang='en', tld='co.in') 
     
-    async def _amain():
-        communicate = edge_tts.Communicate(text, voice)
-        await communicate.save(output_path)
-        
-    asyncio.run(_amain())
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    tts.save(output_path)
     
     print(f"Voice saved: {output_path}")
-    
-    # Adjustment for speed if needed (Edge-TTS is already quite natural)
-    # If output_path is being used by FFmpeg later, it's already there.
     return output_path
