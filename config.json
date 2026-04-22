@@ -3,7 +3,7 @@
   "chesscom_username": "YOUR_CHESSCOM_USERNAME",
   "use_platform": "lichess",
 
-  "openrouter_model": "google/gemma-2-9b-it:free",
+  "openrouter_model": "minimax/minimax-m2.5:free",
 
   "elevenlabs_voice_id": "YOUR_VOICE_ID",
   "elevenlabs_settings": {
