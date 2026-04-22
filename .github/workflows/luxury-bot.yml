@@ -1,0 +1,51 @@
+name: Luxury Bot - Auto Video Upload
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # Video 1 - roz 4 AM UTC
+    - cron: '0 8 * * *'   # Video 2 - roz 8 AM UTC
+    - cron: '0 12 * * *'  # Video 3 - roz 12 PM UTC
+    - cron: '0 16 * * *'  # Video 4 - roz 4 PM UTC
+  workflow_dispatch:       # Manual "Run workflow" button
+
+jobs:
+  make-and-upload-video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg
+        run: sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create output folder
+        run: mkdir -p output
+
+      - name: Restore YouTube token
+        run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > token.json
+
+      - name: Run Luxury Bot (single video)
+        env:
+          ELEVENLABS_API_KEY:  ${{ secrets.ELEVENLABS_API_KEY }}
+          OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          YOUTUBE_CHANNEL_ID:  ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          PEXELS_API_KEY:      ${{ secrets.PEXELS_API_KEY }}
+        run: python main.py --single
+
+      - name: Save video as artifact (backup)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: luxury-video-${{ github.run_number }}
+          path: output/*.mp4
+          retention-days: 3

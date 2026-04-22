@@ -28,81 +28,36 @@ ELEVENLABS_API_KEY  = os.environ.get("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", config.get("elevenlabs_voice_id", ""))
 YOUTUBE_CHANNEL_ID  = os.environ.get("YOUTUBE_CHANNEL_ID", config.get("youtube_channel_id", ""))
 
-# Famous top Lichess players - zero touch, random pick
-TOP_PLAYERS = [
-    "DrNykterstein",   # Magnus Carlsen
-    "nihalsarin",      # Nihal Sarin
-    "DanielNaroditsky",
-    "penguingim1",     # Andrew Tang
-    "alireza2003",     # Alireza Firouzja
-    "RebeccaHarris",   # Hikaru (one of his accounts)
-    "LyonBeast",
-    "Zhigalko_Sergei",
-    "Baskaran_Adhiban",
-    "rpragchess",      # Praggnanandhaa
-    "vincentkeymer",
-    "mishanick",
-    "Firouzja2003",
+LUXURY_TOPICS = [
+    "Most Expensive Mansions in the World",
+    "Inside a $50 Million Private Jet",
+    "Billionaire Watch Collection (Rolex, Patek Philippe)",
+    "Dubai Billionaire Lifestyle",
+    "Bugatti Chiron vs Rolls Royce",
+    "How to make your first $1 Million",
+    "Old Money vs New Money Lifestyle",
+    "Top 3 Most Expensive Yachts in Monaco",
+    "Ambanis Lifestyle Details",
+    "Silicon Valley CEO Habits",
+    "What $100 Million buys you in real estate",
+    "Most expensive luxury cars 2026"
 ]
 
 
-def fetch_top_player_game():
-    # Try multiple players until we find one with valid games
-    shuffled_players = TOP_PLAYERS.copy()
-    random.shuffle(shuffled_players)
-    
-    for player in shuffled_players:
-        try:
-            print(f"Fetching games from top player: {player}")
-            url = f"https://lichess.org/api/games/user/{player}?max=50&analysed=true&evals=true&perfType=bullet,blitz"
-            headers = {"Accept": "application/x-ndjson"}
-            r = requests.get(url, headers=headers, stream=True, timeout=15)
-            
-            games = []
-            for line in r.iter_lines():
-                if line:
-                    try:
-                        games.append(json.loads(line))
-                    except Exception:
-                        pass
-            
-            if games:
-                print(f"Found {len(games)} games from {player}")
-                return random.choice(games), player
-            else:
-                print(f"No analysed games found for {player}, trying next...")
-        except Exception as e:
-            print(f"Error fetching from {player}: {e}")
-            
-    raise Exception("Could not find any analysed games for any of the top players.")
+def generate_luxury_topic():
+    topic = random.choice(LUXURY_TOPICS)
+    print(f"Selected Luxury Topic: {topic}")
+    return topic
 
 
-def extract_blunder(game):
-    analysis = game.get("analysis", [])
-    blunders = []
-    for i, move in enumerate(analysis):
-        if move.get("judgment", {}).get("name") in ["Blunder", "Mistake"]:
-            blunders.append((i, move))
-    if not blunders:
-        return None
-    blunder_index, blunder_move = random.choice(blunders)
-    return {
-        "pgn": game.get("pgn", ""),
-        "blunder_move": blunder_move,
-        "blunder_index": blunder_index,
-        "game_id": game.get("id", "unknown"),
-        "players": game.get("players", {})
-    }
-
-
-def call_openrouter(prompt, tone, player):
+def call_openrouter(prompt, tone, topic):
     model = config.get("openrouter_model", "mistralai/mistral-7b-instruct:free")
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/shairo009/human-chess-bot-yt",
-        "X-Title": "Human Chess Bot YT"
+        "HTTP-Referer": "https://github.com/shairo009/luxury-youtube-bot",
+        "X-Title": "Luxury YouTube Bot"
     }
     payload = {
         "model": model,
@@ -110,7 +65,7 @@ def call_openrouter(prompt, tone, player):
             {
                 "role": "system",
                 "content": (
-                    "You are a human YouTube Shorts chess creator. "
+                    "You are a human YouTube Shorts creator for a luxury and motivation channel. "
                     "Use Hinglish (Hindi + English mix). "
                     "Respond ONLY in the exact OUTPUT format given, nothing else."
                 )
@@ -120,7 +75,7 @@ def call_openrouter(prompt, tone, player):
                 "content": (
                     prompt
                     + f"\n\nTone for this video: {tone}"
-                    + f"\nThis blunder is from a game by top player: {player}"
+                    + f"\nThis video is about: {topic}"
                 )
             }
         ],
@@ -139,7 +94,7 @@ def parse_script(raw):
     current_key = None
     for line in raw.strip().split("\n"):
         matched = False
-        for key in ["HOOK", "VOICE_LINES", "STYLE", "TITLE", "DESCRIPTION", "HASHTAGS", "EDIT_PLAN"]:
+        for key in ["HOOK", "VOICE_LINES", "SEARCH_QUERY", "TITLE", "DESCRIPTION", "HASHTAGS"]:
             if line.startswith(f"{key}:"):
                 current_key = key
                 result[key] = line[len(key)+1:].strip()
@@ -154,17 +109,9 @@ def make_one_video(index=0):
     tone = random.choice(TONES)
     print(f"\nTone selected: {tone}")
 
-    blunder = None
-    player = None
-    while not blunder:
-        game, player = fetch_top_player_game()
-        blunder = extract_blunder(game)
-        if not blunder:
-            print("No blunder found in this game, retrying with another...")
+    topic = generate_luxury_topic()
 
-    print(f"Game: {blunder['game_id']} | Blunder at move: {blunder['blunder_index']} | Player: {player}")
-
-    raw_script = call_openrouter(PROMPT_TEMPLATE, tone, player)
+    raw_script = call_openrouter(PROMPT_TEMPLATE, tone, topic)
     script = parse_script(raw_script)
     print("Script:\n", json.dumps(script, indent=2, ensure_ascii=False))
 
@@ -175,12 +122,14 @@ def make_one_video(index=0):
         api_key=ELEVENLABS_API_KEY
     )
 
-    print(f"Generating video for Game: {blunder['game_id']}...")
+    print(f"Generating luxury video for Topic: {topic}...")
+    search_query = script.get("SEARCH_QUERY", "luxury").replace("SEARCH_QUERY:", "").strip()
+    if not search_query:
+        search_query = "luxury"
+        
     video_file = create_video(
-        game_id=blunder["game_id"],
-        blunder_index=blunder["blunder_index"],
+        search_query=search_query,
         voice_file=voice_file,
-        edit_plan=script.get("EDIT_PLAN", ""),
         output_path=f"output/video_{index}.mp4"
     )
     print(f"Video created: {video_file}")
@@ -189,7 +138,7 @@ def make_one_video(index=0):
     random_emojis = ["♟️", "🔥", "😱", "💀", "👑", "🚀", "💥", "🤖"]
     jitter = random.choice(random_emojis) + " " + random.choice(random_emojis)
     
-    final_title = f"{script.get('TITLE', 'Chess Blunder')} {jitter}"[:100]
+    final_title = f"{script.get('TITLE', 'Billionaire Lifestyle')} {jitter}"[:100]
     
     if "--no-upload" in sys.argv:
         print(f"Skipping upload for video {index+1} (--no-upload is set).")
@@ -197,7 +146,7 @@ def make_one_video(index=0):
         upload_to_youtube(
             video_path=video_file,
             title=final_title,
-            description=script.get("DESCRIPTION", "") + "\n\n" + script.get("HASHTAGS", "") + "\n\n#Chess #Shorts #Automation",
+            description=script.get("DESCRIPTION", "") + "\n\n" + script.get("HASHTAGS", "") + "\n\n#Luxury #Billionaire #Shorts #Motivation",
             tags=script.get("HASHTAGS", "").replace("#", "").split()
         )
         print(f"Video {index+1} uploaded successfully!")
@@ -219,7 +168,7 @@ def run_all():
 
 if __name__ == "__main__":
     if "--single" in sys.argv:
-        # Retry up to 3 times for a single video in case of transient API errors (like Lichess GIF 404)
+        # Retry up to 3 times for a single video in case of transient errors
         for attempt in range(3):
             try:
                 make_one_video(index=int(time.time()) % 10000)
